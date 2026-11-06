@@ -2,7 +2,7 @@
 # open the project's Google Drive folder in Explorer, and both Folder and
 # Todoist links put the browser back behind Notion. No admin rights needed.
 # Run it again any time to update. Run from any window:
-#   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://gabrielbusch08.github.io/open-folder/install.ps1 | iex"
+#   powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol='Tls12'; iex (New-Object Net.WebClient).DownloadString('https://gabrielbusch08.github.io/open-folder/install.ps1')"
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSEdition -eq 'Core') { throw 'Run this with Windows PowerShell (powershell.exe), not PowerShell 7.' }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

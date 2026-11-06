@@ -16,7 +16,7 @@ In Notion, the `Folder` formula on Projects DB and Areas DB builds the link from
 Press Win+R, paste, Enter:
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://gabrielbusch08.github.io/open-folder/install.ps1 | iex"
+powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol='Tls12'; iex (New-Object Net.WebClient).DownloadString('https://gabrielbusch08.github.io/open-folder/install.ps1')"
 ```
 
 It builds `open-folder.exe` in `%LOCALAPPDATA%\open-folder` with Windows' own C# compiler and registers `openfolder:` and `opentodoist:` links for this user, then opens open-todoist's `#helper-on` page in the default browser. Run it again to update. The first click in Firefox asks which app to use: pick open-folder and tick "Always".
