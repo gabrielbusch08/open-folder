@@ -1,6 +1,10 @@
 // open-folder: opens a Google Drive folder in Windows Explorer from an
-// "openfolder:<folder name>" link. install.ps1 compiles this file into
-// open-folder.exe and registers it for openfolder: links (this user only).
+// "openfolder:<folder name>" link, and a Todoist project from an
+// "opentodoist:<project ID>" link. install.ps1 compiles this file into
+// open-folder.exe and registers it for both link types (this user only).
+//
+// Either way it then sends the browser window that handed over the link
+// behind every other window, so the Notion window it covered shows again.
 //
 // The link carries a folder NAME, not a path, so it keeps working when a
 // project folder moves between stages (Ideas, Backlog, ACTIVE, Archive).
@@ -15,6 +19,8 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
 using System.Windows.Forms;
 
 static class OpenFolder
@@ -27,11 +33,44 @@ static class OpenFolder
 
     [DllImport("user32.dll")]
     static extern bool AllowSetForegroundWindow(int processId);
+    [DllImport("user32.dll")]
+    static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]
+    static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+    [DllImport("user32.dll")]
+    static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
+    static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
+    const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOACTIVATE = 0x10;
+    static readonly string[] Browsers = { "firefox", "chrome", "msedge", "brave", "opera" };
 
     [STAThread]
     static int Main(string[] args)
     {
-        string name = args.Length > 0 ? NameFromLink(args[0]) : "";
+        string link = args.Length > 0 ? args[0] : "";
+        // The browser is in front right now: it just handed over the link.
+        IntPtr browser = BrowserWindow();
+        int result = link.StartsWith("opentodoist:", StringComparison.OrdinalIgnoreCase)
+            ? OpenTodoist(link)
+            : OpenDriveFolder(link);
+        SendToBack(browser);
+        return result;
+    }
+
+    // "opentodoist:6ghQ34VjfcV5PX8J" -> the Todoist app on that project.
+    static int OpenTodoist(string link)
+    {
+        string id = link.Substring("opentodoist:".Length).Trim('/');
+        if (!Regex.IsMatch(id, "^[A-Za-z0-9]+$")) return 1;
+        AllowSetForegroundWindow(-1);
+        ProcessStartInfo psi = new ProcessStartInfo("todoist://project?id=" + id);
+        psi.UseShellExecute = true;
+        Process.Start(psi);
+        return 0;
+    }
+
+    static int OpenDriveFolder(string link)
+    {
+        string name = NameFromLink(link);
         string drive = FindDriveRoot();
         if (drive == null)
         {
@@ -174,6 +213,32 @@ static class OpenFolder
         ProcessStartInfo psi = new ProcessStartInfo("explorer.exe", "\"" + folder + "\"");
         psi.UseShellExecute = false;
         Process.Start(psi);
+    }
+
+    // The front window, if it belongs to a browser; otherwise none.
+    static IntPtr BrowserWindow()
+    {
+        try
+        {
+            IntPtr w = GetForegroundWindow();
+            uint pid;
+            GetWindowThreadProcessId(w, out pid);
+            string process = Process.GetProcessById((int)pid).ProcessName.ToLowerInvariant();
+            return Array.IndexOf(Browsers, process) >= 0 ? w : IntPtr.Zero;
+        }
+        catch (Exception) { return IntPtr.Zero; }
+    }
+
+    // Behind all other windows, without taking the focus. Twice, in case the
+    // browser comes forward again when its tab closes.
+    static void SendToBack(IntPtr window)
+    {
+        if (window == IntPtr.Zero) return;
+        foreach (int wait in new int[] { 300, 900 })
+        {
+            Thread.Sleep(wait);
+            SetWindowPos(window, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+        }
     }
 
     static void Show(string message)
