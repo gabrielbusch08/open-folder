@@ -1,8 +1,11 @@
 # Installs open-folder for this Windows user, so Notion's "Folder" links
 # open the project's Google Drive folder in Explorer, and both Folder and
 # Todoist links put the browser back behind Notion. No admin rights needed.
-# Run it again any time to update. Run from any window:
-#   powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol='Tls12'; iex (New-Object Net.WebClient).DownloadString('https://gabrielbusch08.github.io/open-folder/install.ps1')"
+# A PowerShell script, served as .txt so Windows PowerShell's irm reads it as
+# text. Run it again any time to update. In a Windows PowerShell window, paste
+# these two lines one at a time (short, so a terminal copy doesn't break them):
+#   [Net.ServicePointManager]::SecurityProtocol='Tls12'
+#   irm https://gabrielbusch08.github.io/open-folder/install.txt | iex
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSEdition -eq 'Core') { throw 'Run this with Windows PowerShell (powershell.exe), not PowerShell 7.' }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

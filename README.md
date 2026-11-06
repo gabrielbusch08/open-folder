@@ -13,13 +13,14 @@ In Notion, the `Folder` formula on Projects DB and Areas DB builds the link from
 
 ## Install (once per Windows PC, no admin rights)
 
-Press Win+R, paste, Enter:
+Open **Windows PowerShell** (Start menu) and paste these two lines, one at a time:
 
 ```
-powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol='Tls12'; iex (New-Object Net.WebClient).DownloadString('https://gabrielbusch08.github.io/open-folder/install.ps1')"
+[Net.ServicePointManager]::SecurityProtocol='Tls12'
+irm https://gabrielbusch08.github.io/open-folder/install.txt | iex
 ```
 
-It builds `open-folder.exe` in `%LOCALAPPDATA%\open-folder` with Windows' own C# compiler and registers `openfolder:` and `opentodoist:` links for this user, then opens open-todoist's `#helper-on` page in the default browser. Run it again to update. The first click in Firefox asks which app to use: pick open-folder and tick "Always".
+`install.txt` is a PowerShell script; the `.txt` makes GitHub Pages serve it as text, which `irm` needs. It builds `open-folder.exe` in `%LOCALAPPDATA%\open-folder` with Windows' own C# compiler and registers `openfolder:` and `opentodoist:` links for this user, then opens open-todoist's `#helper-on` page in the default browser. Run it again to update. The first click in Firefox asks which app to use: pick open-folder and tick "Always".
 
 If the Drive sits somewhere unusual, put its `My Drive` path in `%LOCALAPPDATA%\open-folder\drive.txt`.
 
