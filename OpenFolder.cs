@@ -37,7 +37,7 @@ static class OpenFolder
     static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")]
     static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
     static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
     const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOACTIVATE = 0x10;
@@ -47,12 +47,14 @@ static class OpenFolder
     static int Main(string[] args)
     {
         string link = args.Length > 0 ? args[0] : "";
+        Log("link " + link);
         // The browser is in front right now: it just handed over the link.
         IntPtr browser = BrowserWindow();
         int result = link.StartsWith("opentodoist:", StringComparison.OrdinalIgnoreCase)
             ? OpenTodoist(link)
             : OpenDriveFolder(link);
         SendToBack(browser);
+        Log("done, result " + result + "; front window now: " + ProcessOf(GetForegroundWindow()));
         return result;
     }
 
@@ -218,15 +220,38 @@ static class OpenFolder
     // The front window, if it belongs to a browser; otherwise none.
     static IntPtr BrowserWindow()
     {
+        IntPtr w = GetForegroundWindow();
+        string process = ProcessOf(w);
+        bool isBrowser = Array.IndexOf(Browsers, process) >= 0;
+        Log("front window at start: " + process + " " + w + (isBrowser ? " (browser)" : " (not a browser)"));
+        return isBrowser ? w : IntPtr.Zero;
+    }
+
+    static string ProcessOf(IntPtr window)
+    {
         try
         {
-            IntPtr w = GetForegroundWindow();
             uint pid;
-            GetWindowThreadProcessId(w, out pid);
-            string process = Process.GetProcessById((int)pid).ProcessName.ToLowerInvariant();
-            return Array.IndexOf(Browsers, process) >= 0 ? w : IntPtr.Zero;
+            GetWindowThreadProcessId(window, out pid);
+            return Process.GetProcessById((int)pid).ProcessName.ToLowerInvariant();
         }
-        catch (Exception) { return IntPtr.Zero; }
+        catch (Exception) { return "?"; }
+    }
+
+    // A short log next to the program, for when something doesn't work:
+    // %LOCALAPPDATA%\open-folder\log.txt, cut back to its last 100 lines.
+    static void Log(string line)
+    {
+        try
+        {
+            string path = Path.Combine(AppFolder(), "log.txt");
+            List<string> lines = new List<string>();
+            if (File.Exists(path)) lines.AddRange(File.ReadAllLines(path));
+            lines.Add(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "  " + line);
+            if (lines.Count > 100) lines.RemoveRange(0, lines.Count - 100);
+            File.WriteAllLines(path, lines.ToArray());
+        }
+        catch (Exception) { }
     }
 
     // Behind all other windows, without taking the focus. Twice, in case the
@@ -237,7 +262,8 @@ static class OpenFolder
         foreach (int wait in new int[] { 300, 900 })
         {
             Thread.Sleep(wait);
-            SetWindowPos(window, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+            bool ok = SetWindowPos(window, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
+            Log("sent browser back after " + wait + " ms: " + (ok ? "ok" : "failed, error " + Marshal.GetLastWin32Error()));
         }
     }
 
