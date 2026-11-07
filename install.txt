@@ -21,6 +21,7 @@ Invoke-WebRequest "$base/OpenFolder.cs" -OutFile $src -UseBasicParsing
 if (Test-Path $exe) { Remove-Item $exe -Force }
 Add-Type -Path $src -OutputAssembly $exe -OutputType WindowsApplication -ReferencedAssemblies System.Windows.Forms
 
+$firstInstall = -not (Test-Path 'HKCU:\Software\Classes\opentodoist')
 Write-Host 'Registering openfolder: and opentodoist: links for this user...'
 foreach ($scheme in 'openfolder', 'opentodoist') {
   $key = "HKCU:\Software\Classes\$scheme"
@@ -46,7 +47,10 @@ if ($found) {
   Write-Host "Start Google Drive for desktop, or put your Drive's path in $(Join-Path $dir 'drive.txt')"
 }
 
-# Tell the default browser (Firefox) to send Todoist links through open-folder
-# from now on: the Todoist page keeps that setting per browser.
-Write-Host 'Opening a page in your browser to switch Todoist links over to open-folder...'
-Start-Process 'https://gabrielbusch08.github.io/open-todoist/#helper-on'
+# First install only: tell the default browser (Firefox) to send Todoist links
+# through open-folder from now on (the Todoist page keeps that per browser).
+# Not on updates, because that page also turns auto-close off again.
+if ($firstInstall) {
+  Write-Host 'Opening a page in your browser to switch Todoist links over to open-folder...'
+  Start-Process 'https://gabrielbusch08.github.io/open-todoist/#helper-on'
+}
