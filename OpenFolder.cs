@@ -93,12 +93,42 @@ static class OpenFolder
             Open(found);
             return 0;
         }
+        // No folder yet: offer to make one for the project in IN PROGRESS.
+        string inProgress = Path.Combine(drive, Path.Combine("01 PROJECTS", "IN PROGRESS"));
+        string folderName = SafeFolderName(name);
+        if (Directory.Exists(inProgress) && folderName != null)
+        {
+            DialogResult answer = MessageBox.Show(
+                "No folder named \"" + name + "\" in your Drive yet.\n\n" +
+                "Create it in 01 PROJECTS\\IN PROGRESS?",
+                Title, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (answer != DialogResult.Yes) return 1;
+            string created = Path.Combine(inProgress, folderName);
+            Directory.CreateDirectory(created);
+            Log("created " + created);
+            Open(created);
+            return 0;
+        }
         string fallback = Path.Combine(drive, "01 PROJECTS");
         if (!Directory.Exists(fallback)) fallback = drive;
         Open(fallback);
         Show("No folder named \"" + name + "\" in your Drive's 02 AREAS or 01 PROJECTS.\n\n" +
              "The Drive folder needs the same name as the Notion page. Opened " + fallback + " instead.");
         return 1;
+    }
+
+    // The page name as a folder name: characters Windows doesn't allow in
+    // names (like / or :) become "-". Null if nothing usable is left, so a
+    // name can never point outside IN PROGRESS.
+    static string SafeFolderName(string name)
+    {
+        StringBuilder sb = new StringBuilder();
+        foreach (char c in name ?? "")
+            sb.Append(Array.IndexOf(Path.GetInvalidFileNameChars(), c) >= 0 ? '-' : c);
+        string n = sb.ToString().Trim().TrimEnd('.', ' ');
+        if (n.Length > 100) n = n.Substring(0, 100).Trim();
+        if (n.Length == 0 || n == "." || n == ".." || Key(n).Length == 0) return null;
+        return n;
     }
 
     // "openfolder:Notion%20Setup" or "openfolder://Notion%20Setup/" -> "Notion Setup"
