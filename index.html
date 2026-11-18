@@ -27,8 +27,8 @@
 <script>
   // Link format: https://<this page>/#<folder name>, e.g. #Notion%20Setup
   // The name is after the "#", so it never reaches the server. The page hands
-  // it to the openfolder: link that install.ps1 registers on Windows; the
-  // program there finds the Drive folder with that name and opens it.
+  // it to the openfolder: link that install.txt registers on Windows; the
+  // script there finds the Drive folder with that name and opens it.
   var name = location.hash.slice(1);
   try { name = decodeURIComponent(name); } catch (e) {}
   name = name.trim();

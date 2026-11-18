@@ -1,56 +1,67 @@
 # Installs open-folder for this Windows user, so Notion's "Folder" links
-# open the project's Google Drive folder in Explorer, and both Folder and
-# Todoist links put the browser back behind Notion. No admin rights needed.
+# open the project's Google Drive folder in Explorer. No admin rights needed.
 # A PowerShell script, served as .txt so Windows PowerShell's irm reads it as
-# text. Run it again any time to update. In a Windows PowerShell window, paste
-# these two lines one at a time (short, so a terminal copy doesn't break them):
-#   [Net.ServicePointManager]::SecurityProtocol='Tls12'
+# text. Run it again any time to update. In a Windows PowerShell window, paste:
 #   irm https://gabrielbusch08.github.io/open-folder/install.txt | iex
+#
+# It installs a script, open-folder.ps1, run by Windows' own PowerShell, not a
+# program of its own: Smart App Control blocks unsigned programs. It works in
+# Constrained Language mode (cmdlets only), which Smart App Control may impose.
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSEdition -eq 'Core') { throw 'Run this with Windows PowerShell (powershell.exe), not PowerShell 7.' }
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+try { [Net.ServicePointManager]::SecurityProtocol = 'Tls12' } catch { }
 
 $base = 'https://gabrielbusch08.github.io/open-folder'
 $dir = Join-Path $env:LOCALAPPDATA 'open-folder'
-$src = Join-Path $dir 'OpenFolder.cs'
-$exe = Join-Path $dir 'open-folder.exe'
+$script = Join-Path $dir 'open-folder.ps1'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 
-Write-Host 'Downloading and building open-folder.exe...'
-Invoke-WebRequest "$base/OpenFolder.cs" -OutFile $src -UseBasicParsing
-if (Test-Path $exe) { Remove-Item $exe -Force }
-Add-Type -Path $src -OutputAssembly $exe -OutputType WindowsApplication -ReferencedAssemblies System.Windows.Forms
+Write-Host 'Downloading open-folder.ps1...'
+Invoke-WebRequest "$base/open-folder.ps1" -OutFile $script -UseBasicParsing
+Unblock-File -LiteralPath $script
 
-$firstInstall = -not (Test-Path 'HKCU:\Software\Classes\opentodoist')
+# The old version was a program built on this PC (open-folder.exe), which
+# Smart App Control blocks. Remove it.
+$oldExe = Join-Path $dir 'open-folder.exe'
+$hadOldExe = Test-Path -LiteralPath $oldExe
+foreach ($old in @($oldExe, (Join-Path $dir 'OpenFolder.cs'))) {
+  if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old -Force }
+}
+
+# conhost --headless runs PowerShell without a window flashing up.
+$conhost = Join-Path $env:SystemRoot 'System32\conhost.exe'
+$powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$command = "`"$conhost`" --headless `"$powershell`" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`" `"%1`""
+
 Write-Host 'Registering openfolder: and opentodoist: links for this user...'
 foreach ($scheme in 'openfolder', 'opentodoist') {
   $key = "HKCU:\Software\Classes\$scheme"
   New-Item -Path $key -Force -Value "URL:$scheme (open-folder)" | Out-Null
   New-ItemProperty -Path $key -Name 'URL Protocol' -Value '' -PropertyType String -Force | Out-Null
   New-Item -Path "$key\DefaultIcon" -Force -Value 'explorer.exe,0' | Out-Null
-  New-Item -Path "$key\shell\open\command" -Force -Value "`"$exe`" `"%1`"" | Out-Null
+  New-Item -Path "$key\shell\open\command" -Force -Value $command | Out-Null
 }
 
-# Same search as the program, to say where it will look.
-$found = $null
-$bases = @($env:USERPROFILE, (Join-Path $env:USERPROFILE 'Google Drive')) + (Get-PSDrive -PSProvider FileSystem | ForEach-Object { $_.Root })
+# Same search as the script, to say where it will look.
+$found = ''
+$bases = @($env:USERPROFILE, (Join-Path $env:USERPROFILE 'Google Drive')) + @(Get-PSDrive -PSProvider FileSystem | ForEach-Object { $_.Root })
 foreach ($b in $bases) { foreach ($n in 'My Drive', 'Meu Drive') {
   $p = Join-Path $b $n
-  if (-not $found -and (Test-Path (Join-Path $p '02 AREAS'))) { $found = $p }
+  if (-not $found -and (Test-Path -LiteralPath (Join-Path $p '02 AREAS'))) { $found = $p }
 } }
 Write-Host ''
 if ($found) {
   Write-Host "Done. Your Drive: $found" -ForegroundColor Green
-  Write-Host 'Test it: click a Folder link in Notion. Firefox asks once which app to use: pick open-folder and tick "Always".'
+  Write-Host 'Test it: click a Folder link in Notion. If Firefox asks which app to use, pick the one it offers and tick "Always".'
 } else {
   Write-Host 'Installed, but no My Drive / Meu Drive folder with "02 AREAS" was found.' -ForegroundColor Yellow
   Write-Host "Start Google Drive for desktop, or put your Drive's path in $(Join-Path $dir 'drive.txt')"
 }
 
-# First install only: tell the default browser (Firefox) to send Todoist links
-# through open-folder from now on (the Todoist page keeps that per browser).
-# Not on updates, because that page also turns auto-close off again.
-if ($firstInstall) {
-  Write-Host 'Opening a page in your browser to switch Todoist links over to open-folder...'
-  Start-Process 'https://gabrielbusch08.github.io/open-todoist/#helper-on'
+# Updating from the old program: Todoist links no longer gain anything from
+# going through open-folder (it can't put the browser back behind Notion any
+# more), so tell the default browser to open the Todoist app directly again.
+if ($hadOldExe) {
+  Write-Host 'Opening a page in your browser to send Todoist links straight to the Todoist app again...'
+  Start-Process 'https://gabrielbusch08.github.io/open-todoist/#helper-off'
 }
